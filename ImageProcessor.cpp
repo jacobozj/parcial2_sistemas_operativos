@@ -4,6 +4,7 @@
 #include <cmath>
 #include <cstring>
 #include <algorithm>
+
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 #define STB_IMAGE_WRITE_IMPLEMENTATION
@@ -38,19 +39,31 @@ bool ImageProcessor::loadImage(const std::string &filename)
 
     if (useBuddySystem)
     {
-        buddyMemory = BuddySystem::allocate(size);
+        buddyMemory = BuddySystem::allocate(size + sizeof(BuddySystem::Block));
         if (!buddyMemory)
         {
             std::cerr << "Error: Buddy System no pudo asignar memoria\n";
             delete[] originalPixels;
             originalPixels = nullptr;
-            stbi_image_free(pixels);
+            stbi_image_free(pixels); // esto sí está bien aquí, porque viene de stbi_load
             return false;
         }
-        memcpy(buddyMemory, pixels, size);
-        stbi_image_free(pixels);
-        pixels = static_cast<unsigned char *>(buddyMemory);
+
+        // Offset después del header
+        pixels = reinterpret_cast<unsigned char *>(
+            static_cast<char *>(buddyMemory) + sizeof(BuddySystem::Block));
+
+        memcpy(pixels, originalPixels, size);
+
+        // ✅ NO liberar pixels aquí, ya que apuntan a buddyMemory
     }
+    else
+    {
+        stbi_image_free(pixels);
+        pixels = new unsigned char[size];
+        memcpy(pixels, originalPixels, size);
+    }
+
     return true;
 }
 
@@ -92,7 +105,6 @@ void ImageProcessor::rotateImage(float angle)
     float cosA = cos(rad);
     float sinA = sin(rad);
 
-    // Calcular dimensiones de salida
     int newWidth = static_cast<int>(fabs(originalWidth * cosA) + fabs(originalHeight * sinA));
     int newHeight = static_cast<int>(fabs(originalWidth * sinA) + fabs(originalHeight * cosA));
     size_t newSize = newWidth * newHeight * channels;
@@ -104,7 +116,6 @@ void ImageProcessor::rotateImage(float angle)
     float newCx = newWidth / 2.0f;
     float newCy = newHeight / 2.0f;
 
-    // Depuración: Imprimir dimensiones
     std::cout << "[DEBUG] Nuevas dimensiones: " << newWidth << "x" << newHeight << "\n";
 
     for (int y = 0; y < newHeight; ++y)
@@ -113,7 +124,7 @@ void ImageProcessor::rotateImage(float angle)
         {
             float dx = x - newCx;
             float dy = y - newCy;
-            // Rotación inversa para mapear de salida a entrada
+
             float srcX = cosA * dx + sinA * dy + cx;
             float srcY = -sinA * dx + cosA * dy + cy;
 
@@ -123,19 +134,19 @@ void ImageProcessor::rotateImage(float angle)
                 float value = interpolateBilinear(srcX, srcY, c);
                 pixels[idx + c] = static_cast<unsigned char>(std::max(0.0f, std::min(255.0f, value)));
             }
-
-            // Depuración: Imprimir valores para el primer píxel
-            if (x == 0 && y == 0)
-            {
-                std::cout << "[DEBUG] x: " << x << ", y: " << y
-                          << ", srcX: " << srcX << ", srcY: " << srcY
-                          << ", value (R): " << (int)pixels[idx] << "\n";
-            }
         }
     }
 
     width = newWidth;
     height = newHeight;
+
+    if (originalPixels)
+        delete[] originalPixels;
+
+    originalWidth = width;
+    originalHeight = height;
+    originalPixels = new unsigned char[newSize];
+    memcpy(originalPixels, pixels, newSize);
 }
 
 void ImageProcessor::scaleImage(float scale)
@@ -163,25 +174,37 @@ void ImageProcessor::scaleImage(float scale)
 
     width = newWidth;
     height = newHeight;
+
+    if (originalPixels)
+        delete[] originalPixels;
+
+    originalWidth = width;
+    originalHeight = height;
+    originalPixels = new unsigned char[newSize];
+    memcpy(originalPixels, pixels, newSize);
 }
 
 void ImageProcessor::allocateMemory(size_t size)
 {
     freeMemory();
+
     if (useBuddySystem)
     {
-        buddyMemory = BuddySystem::allocate(size);
+        buddyMemory = BuddySystem::allocate(size + sizeof(BuddySystem::Block));
         if (!buddyMemory)
         {
             std::cerr << "Error: Buddy System no pudo asignar memoria\n";
             return;
         }
-        pixels = static_cast<unsigned char *>(buddyMemory);
+
+        pixels = reinterpret_cast<unsigned char *>(
+            static_cast<char *>(buddyMemory) + sizeof(BuddySystem::Block));
     }
     else
     {
         pixels = new unsigned char[size];
     }
+
     if (pixels)
     {
         memset(pixels, 0, size);
@@ -199,6 +222,7 @@ void ImageProcessor::freeMemory()
     {
         delete[] pixels;
     }
+
     pixels = nullptr;
 }
 
