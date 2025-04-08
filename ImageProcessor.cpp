@@ -45,7 +45,7 @@ bool ImageProcessor::loadImage(const std::string &filename)
             std::cerr << "Error: Buddy System no pudo asignar memoria\n";
             delete[] originalPixels;
             originalPixels = nullptr;
-            stbi_image_free(pixels); // esto sí está bien aquí, porque viene de stbi_load
+            stbi_image_free(pixels);
             return false;
         }
 
@@ -54,8 +54,6 @@ bool ImageProcessor::loadImage(const std::string &filename)
             static_cast<char *>(buddyMemory) + sizeof(BuddySystem::Block));
 
         memcpy(pixels, originalPixels, size);
-
-        // ✅ NO liberar pixels aquí, ya que apuntan a buddyMemory
     }
     else
     {
@@ -116,7 +114,7 @@ void ImageProcessor::rotateImage(float angle)
     float newCx = newWidth / 2.0f;
     float newCy = newHeight / 2.0f;
 
-    std::cout << "[DEBUG] Nuevas dimensiones: " << newWidth << "x" << newHeight << "\n";
+    // std::cout << "[DEBUG] Nuevas dimensiones: " << newWidth << "x" << newHeight << "\n";
 
     for (int y = 0; y < newHeight; ++y)
     {

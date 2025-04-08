@@ -7,13 +7,12 @@
 class BuddySystem
 {
 public:
-    BuddySystem(size_t totalSize = 8 * 1024 * 1024); // 1 MB por defecto
+    BuddySystem(size_t totalSize = 8 * 1024 * 1024); // 1 MB por defecto aumentamos a 8 MB
     ~BuddySystem();
 
     static void *allocate(size_t size);
     static void free(void *ptr);
 
-    // 🔓 Hacemos pública la estructura para que pueda usarse en ImageProcessor
     struct Block
     {
         size_t size;

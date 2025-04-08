@@ -52,7 +52,7 @@ void BuddySystem::splitBlock(size_t level)
 void *BuddySystem::allocate(size_t size)
 {
     if (!instance)
-        instance = new BuddySystem(8 * 1024 * 1024); // mismo tamaño que definiste
+        instance = new BuddySystem(8 * 1024 * 1024); // mismo tamaño que defini
 
     size_t allocSize = pow(2, ceil(log2(size)));
     size_t level = instance->getLevel(allocSize);
