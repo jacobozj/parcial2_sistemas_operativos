@@ -4,6 +4,7 @@
 #include <cmath>
 #include <cstring>
 #include <algorithm>
+#include <omp.h>
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
@@ -116,13 +117,13 @@ void ImageProcessor::rotateImage(float angle)
 
     // std::cout << "[DEBUG] Nuevas dimensiones: " << newWidth << "x" << newHeight << "\n";
 
+#pragma omp parallel for collapse(2)
     for (int y = 0; y < newHeight; ++y)
     {
         for (int x = 0; x < newWidth; ++x)
         {
             float dx = x - newCx;
             float dy = y - newCy;
-
             float srcX = cosA * dx + sinA * dy + cx;
             float srcY = -sinA * dx + cosA * dy + cy;
 
@@ -155,6 +156,7 @@ void ImageProcessor::scaleImage(float scale)
 
     allocateMemory(newSize);
 
+#pragma omp parallel for collapse(2)
     for (int y = 0; y < newHeight; ++y)
     {
         for (int x = 0; x < newWidth; ++x)

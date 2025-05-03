@@ -5,10 +5,11 @@
 #include <tuple>
 #include "ImageProcessor.h"
 #include "BuddySystem.h"
+#include <omp.h>
 
 void printUsage()
 {
-    std::cout << "Uso: ./programa_imagen entrada.jpg salida.jpg -angulo <grados> -escalar <factor>\n";
+    std::cout << "Uso: ./programa_imagen entrada.jpg salida.jpg -angulo <grados> -escalar <factor> [-buddy]\n";
 }
 
 std::tuple<long, long> procesarImagen(
@@ -16,42 +17,24 @@ std::tuple<long, long> procesarImagen(
     const std::string &outputFile,
     float angle,
     float scale,
-    bool useBuddy)
+    bool useBuddy,
+    int ompThreads)
 {
     struct rusage usageStart, usageEnd;
     getrusage(RUSAGE_SELF, &usageStart);
     auto start = std::chrono::high_resolution_clock::now();
 
+    omp_set_num_threads(ompThreads);
+
     ImageProcessor processor(useBuddy);
     if (!processor.loadImage(inputFile))
     {
-        std::cerr << "[ERROR] No se pudo cargar la imagen en modo "
-                  << (useBuddy ? "Buddy System" : "Convencional") << "\n";
+        std::cerr << "[ERROR] No se pudo cargar la imagen\n";
         return {-1, -1};
     }
 
-    if (!useBuddy)
-    {
-        std::cout << "------------------------\n";
-        std::cout << "Dimensiones originales: " << processor.getWidth() << " x " << processor.getHeight() << "\n";
-        std::cout << "Canales: " << processor.getChannels() << " (RGB)\n";
-        std::cout << "Ángulo de rotación: " << angle << " grados\n";
-        std::cout << "Factor de escalado: " << scale << "\n";
-        std::cout << "------------------------\n";
-    }
-
     processor.rotateImage(angle);
-    std::cout << "[INFO] Imagen rotada correctamente.\n";
-
     processor.scaleImage(scale);
-    std::cout << "[INFO] Imagen escalada correctamente.\n";
-
-    if (!useBuddy)
-    {
-        std::cout << "------------------------\n";
-        std::cout << "Dimensiones finales: " << processor.getWidth() << " x " << processor.getHeight() << "\n";
-    }
-
     processor.saveImage(outputFile);
 
     auto end = std::chrono::high_resolution_clock::now();
@@ -75,6 +58,7 @@ int main(int argc, char *argv[])
     std::string outputFile = argv[2];
     float angle = 0.0f;
     float scale = 1.0f;
+    bool useBuddy = false;
 
     for (int i = 3; i < argc; ++i)
     {
@@ -83,25 +67,31 @@ int main(int argc, char *argv[])
             angle = std::stof(argv[++i]);
         else if (arg == "-escalar" && i + 1 < argc)
             scale = std::stof(argv[++i]);
+        else if (arg == "-buddy")
+            useBuddy = true;
     }
 
     std::cout << "=== PROCESAMIENTO DE IMAGEN ===\n";
     std::cout << "Archivo de entrada: " << inputFile << "\n";
     std::cout << "Archivo de salida: " << outputFile << "\n";
-    std::cout << "Modo de asignación de memoria: Buddy System\n";
-
-    auto [tiempoConv, memoriaConv] = procesarImagen(inputFile, "temp_conv.jpg", angle, scale, false);
-    auto [tiempoBuddy, memoriaBuddy] = procesarImagen(inputFile, outputFile, angle, scale, true);
-
+    std::cout << "Modo de asignación de memoria: " << (useBuddy ? "Buddy System" : "Convencional") << "\n";
     std::cout << "------------------------\n";
+
+    // Comparación: sin OpenMP (1 hilo)
+    auto [tiempoSec, memSec] = procesarImagen(inputFile, "temp_sin_openmp.jpg", angle, scale, useBuddy, 1);
+
+    // Comparación: con OpenMP (máximo hilos)
+    auto [tiempoPar, memPar] = procesarImagen(inputFile, outputFile, angle, scale, useBuddy, omp_get_max_threads());
+
     std::cout << "TIEMPO DE PROCESAMIENTO:\n";
-    std::cout << " - Sin Buddy System: " << tiempoConv << " ms\n";
-    std::cout << " - Con Buddy System: " << tiempoBuddy << " ms\n";
+    std::cout << " - Sin OpenMP: " << tiempoSec << " ms\n";
+    std::cout << " - Con OpenMP: " << tiempoPar << " ms\n";
+
     std::cout << "\nMEMORIA UTILIZADA:\n";
-    std::cout << " - Sin Buddy System: " << memoriaConv / 1024.0 << " MB\n";
-    std::cout << " - Con Buddy System: " << memoriaBuddy / 1024.0 << " MB\n";
+    std::cout << " - Sin OpenMP: " << memSec / 1024.0 << " MB\n";
+    std::cout << " - Con OpenMP: " << memPar / 1024.0 << " MB\n";
     std::cout << "------------------------\n";
-    std::cout << "[INFO] Imagen guardada correctamente en " << outputFile << "\n";
+    std::cout << "[INFO] Imagen final guardada correctamente en " << outputFile << "\n";
 
     return 0;
 }

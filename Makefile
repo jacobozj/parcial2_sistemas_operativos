@@ -1,11 +1,11 @@
 CC = g++
-CFLAGS = -Wall -g -std=c++11
+CFLAGS = -Wall -g -std=c++11 -fopenmp #comentar y descomentar para comparar los tiempos y desactivar el OpenMP
 LDFLAGS = -lm
 
 all: programa_imagen
 
 programa_imagen: main.o ImageProcessor.o BuddySystem.o
-	$(CC) -o programa_imagen main.o ImageProcessor.o BuddySystem.o $(LDFLAGS)
+	$(CC) -o programa_imagen main.o ImageProcessor.o BuddySystem.o $(LDFLAGS) -fopenmp
 
 main.o: main.cpp ImageProcessor.h BuddySystem.h
 	$(CC) $(CFLAGS) -c main.cpp
